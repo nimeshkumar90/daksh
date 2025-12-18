@@ -14,42 +14,47 @@
       background: #000;
     }
     button {
+      font-size: 18px;
       padding: 10px 20px;
-      font-size: 16px;
-      margin-bottom: 10px;
+      margin: 10px;
+      cursor: pointer;
     }
   </style>
 </head>
 
 <body>
+
   <h2>ECG Web BLE Monitor</h2>
   <button onclick="connectBLE()">Connect ECG</button>
   <br><br>
-  <canvas id="ecgCanvas" width="900" height="300"></canvas>
+  <canvas id="ecgCanvas" width="800" height="300"></canvas>
 
 <script>
 const SERVICE_UUID = '12345678-1234-1234-1234-1234567890ab';
 const CHAR_UUID    = '12345678-1234-1234-1234-1234567890ac';
 
-let ecgData = [];
-const MAX_POINTS = 900;
+let canvas = document.getElementById('ecgCanvas');
+let ctx = canvas.getContext('2d');
 
-const canvas = document.getElementById("ecgCanvas");
-const ctx = canvas.getContext("2d");
+let x = 0;
+let lastY = canvas.height / 2;
 
-function drawECG() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function drawECG(value) {
+  let y = canvas.height / 2 - value;
+
+  ctx.strokeStyle = '#00ff00';
   ctx.beginPath();
-  ctx.strokeStyle = "#0f0";
-
-  for (let i = 0; i < ecgData.length; i++) {
-    let x = i;
-    let y = canvas.height / 2 - ecgData[i];
-
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
+  ctx.moveTo(x, lastY);
+  ctx.lineTo(x + 1, y);
   ctx.stroke();
+
+  lastY = y;
+  x++;
+
+  if (x >= canvas.width) {
+    x = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 async function connectBLE() {
@@ -63,31 +68,20 @@ async function connectBLE() {
     const characteristic = await service.getCharacteristic(CHAR_UUID);
 
     await characteristic.startNotifications();
-    characteristic.addEventListener(
-      'characteristicvaluechanged',
-      handleECGData
-    );
 
-    alert("ECG Connected!");
+    characteristic.addEventListener('characteristicvaluechanged', event => {
+      let value = event.target.value.getInt16(0, true);
+      drawECG(value);
+    });
+
+    alert('Connected to ECG device');
+
   } catch (error) {
     alert(error);
+    console.error(error);
   }
-}
-
-function handleECGData(event) {
-  const value = event.target.value;
-
-  // BLEIntCharacteristic → 32-bit signed int (little endian)
-  let ecg = value.getInt32(0, true);
-
-  ecgData.push(ecg);
-
-  if (ecgData.length > MAX_POINTS) {
-    ecgData.shift();
-  }
-
-  drawECG();
 }
 </script>
+
 </body>
 </html>
