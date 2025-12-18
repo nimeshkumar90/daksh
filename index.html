@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Web BLE ECG Monitor</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #111;
+      color: #0f0;
+    }
+    canvas {
+      border: 1px solid #0f0;
+      background: #000;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>ECG Web BLE Monitor</h2>
+  <button onclick="connectBLE()">Connect ECG</button>
+  <br><br>
+  <canvas id="ecgCanvas" width="900" height="300"></canvas>
+
+<script>
+const SERVICE_UUID = '12345678-1234-1234-1234-1234567890ab';
+const CHAR_UUID    = '12345678-1234-1234-1234-1234567890ac';
+
+let ecgData = [];
+const MAX_POINTS = 900;
+
+const canvas = document.getElementById("ecgCanvas");
+const ctx = canvas.getContext("2d");
+
+function drawECG() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.strokeStyle = "#0f0";
+
+  for (let i = 0; i < ecgData.length; i++) {
+    let x = i;
+    let y = canvas.height / 2 - ecgData[i];
+
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+async function connectBLE() {
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE_UUID] }]
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    const characteristic = await service.getCharacteristic(CHAR_UUID);
+
+    await characteristic.startNotifications();
+    characteristic.addEventListener(
+      'characteristicvaluechanged',
+      handleECGData
+    );
+
+    alert("ECG Connected!");
+  } catch (error) {
+    alert(error);
+  }
+}
+
+function handleECGData(event) {
+  const value = event.target.value;
+
+  // BLEIntCharacteristic → 32-bit signed int (little endian)
+  let ecg = value.getInt32(0, true);
+
+  ecgData.push(ecg);
+
+  if (ecgData.length > MAX_POINTS) {
+    ecgData.shift();
+  }
+
+  drawECG();
+}
+</script>
+</body>
+</html>
